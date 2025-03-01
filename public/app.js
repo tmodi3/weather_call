@@ -52,6 +52,15 @@ document.getElementById('weatherForm').addEventListener('submit', async function
         document.getElementById('windSpeed').textContent = data.windSpeed;
         document.getElementById('windGust').textContent = data.windGust;
         
+        // Show forecast period
+        if (data.forecastPeriod) {
+            document.getElementById('forecastPeriod').textContent = data.forecastPeriod;
+            document.getElementById('forecastTime').textContent = data.forecastTime || '';
+            document.getElementById('forecastSection').style.display = 'block';
+        } else {
+            document.getElementById('forecastSection').style.display = 'none';
+        }
+        
         // Update recommendation with color coding
         const recommendationElement = document.getElementById('weatherRecommendation');
         recommendationElement.textContent = data.recommendation || 'No recommendation';
@@ -70,6 +79,14 @@ document.getElementById('weatherForm').addEventListener('submit', async function
         console.log('Updating UI with received weather data...');
         document.getElementById('resultsSection').style.display = 'block';
         document.getElementById('votesSection').style.display = 'block';
+        
+        // Reset votes display
+        document.getElementById('diningVoteResult').textContent = '-';
+        document.getElementById('programVoteResult').textContent = '-';
+        document.getElementById('facilitiesVoteResult').textContent = '-';
+        document.getElementById('finalDecision').textContent = '-';
+        document.getElementById('finalDecision').className = '';
+        
     } catch (error) {
         console.error('Error fetching weather data:', error.message);
         errorMessage.textContent = error.message || 'Error fetching weather data. Please try again.';

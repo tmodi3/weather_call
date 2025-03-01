@@ -10,7 +10,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Configurations
-const userAgent = 'Performance Weather Decision System (mubms@wisc.edu)';
+const userAgent = process.env.USER_AGENT || 'Performance Weather Decision System (mubms@wisc.edu)';
 const airNowApiKey = process.env.AIRNOW_API_KEY;
 const lat = 43.07625; // Latitude for Memorial Union Terrace
 const lon = -89.40006; // Longitude for Memorial Union Terrace
@@ -94,6 +94,11 @@ app.post('/getWeather', async (req, res) => {
         const recommendation = calculateRecommendation(temp, windSpeed, rainChance, thunderstorm, aqi);
         logger.info(`Recommendation calculated: ${JSON.stringify(recommendation)}`);
 
+        // Format time range for display
+        const periodStart = new Date(period.startTime);
+        const periodEnd = new Date(period.endTime);
+        const periodTimeRange = `${periodStart.toLocaleString()} to ${periodEnd.toLocaleString()}`;
+
         // Respond with all collected data
         const response = {
             thunderstormAlert: thunderstorm ? 'Yes' : 'No',
@@ -104,7 +109,10 @@ app.post('/getWeather', async (req, res) => {
             rainChance: rainChance,
             airQuality: airQuality || 'Unavailable',
             recommendation: recommendation.text,
-            finalDecision: recommendation.finalDecision
+            finalDecision: recommendation.finalDecision,
+            forecastPeriod: period.name,
+            forecastTime: periodTimeRange,
+            shortForecast: period.shortForecast
         };
 
         logger.info(`Final response sent to frontend: ${JSON.stringify(response)}`);
@@ -132,23 +140,48 @@ function extractRainChance(forecastStr) {
 
 function calculateRecommendation(temp, windSpeed, rainChance, thunderstorm, aqi) {
     let score = 0;
+    const scoreDetails = [];
 
     // Temperature scoring
-    if (temp <= 58) score -= 2;
-    else if (temp <= 65) score -= 1;
+    if (temp <= 58) {
+        score -= 2;
+        scoreDetails.push('Temperature below 58°F: -2');
+    } else if (temp <= 65) {
+        score -= 1;
+        scoreDetails.push('Temperature below 65°F: -1');
+    }
 
     // Wind speed scoring
-    if (windSpeed >= 44.7) score -= 2;
-    else if (windSpeed >= 33.5) score -= 1;
+    if (windSpeed >= 44.7) {
+        score -= 2;
+        scoreDetails.push('Wind speed above 44.7 mph: -2');
+    } else if (windSpeed >= 33.5) {
+        score -= 1;
+        scoreDetails.push('Wind speed above 33.5 mph: -1');
+    }
 
     // Rain chance scoring
-    if (rainChance >= 95) score -= 2;
-    else if (rainChance >= 80) score -= 1;
+    if (rainChance >= 95) {
+        score -= 2;
+        scoreDetails.push('Rain chance above 95%: -2');
+    } else if (rainChance >= 80) {
+        score -= 1;
+        scoreDetails.push('Rain chance above 80%: -1');
+    }
 
     // Thunderstorm and AQI scoring
-    if (thunderstorm) score -= 2;
-    if (aqi >= 151) score -= 2;
-    else if (aqi >= 101) score -= 1;
+    if (thunderstorm) {
+        score -= 2;
+        scoreDetails.push('Thunderstorm detected: -2');
+    }
+    
+    if (aqi >= 151) {
+        score -= 2;
+        scoreDetails.push('AQI above 151: -2');
+    } else if (aqi >= 101) {
+        score -= 1;
+        scoreDetails.push('AQI above 101: -1');
+    }
 
     // Determine recommendation based on score
     let text = 'Great';
@@ -156,8 +189,15 @@ function calculateRecommendation(temp, windSpeed, rainChance, thunderstorm, aqi)
     else if (score <= -2) text = 'Marginal';
 
     const finalDecision = text === 'Bad' ? 'Inside' : text === 'Great' ? 'Outside' : 'Depends';
+    
+    logger.info(`Score: ${score}, Details: ${scoreDetails.join(', ')}`);
 
-    return { text, finalDecision };
+    return { 
+        text, 
+        finalDecision, 
+        score,
+        scoreDetails 
+    };
 }
 
 app.post('/submitVotes', (req, res) => {
