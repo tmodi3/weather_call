@@ -1,0 +1,153 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Event Weather Call</title>
+    <!-- Include Bootstrap CSS for improved styling -->
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <header class="text-center mb-4">
+            <img src="logo.jpeg" alt="Union Logo" class="logo mb-3">
+            <h1>Performance Location Recommendation</h1>
+        </header>
+
+        <!-- Step 1: Input Current Time and Make Weather Call -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form id="weatherForm">
+                    <div class="form-group">
+                        <label for="currentTime">Current Time:</label>
+                        <input type="time" id="currentTime" class="form-control" required>
+                    </div>
+                    <button type="submit" id="weatherSubmitButton" class="btn btn-primary">
+                        Make Weather Call
+                    </button>
+                    <div id="loadingIndicator" class="mt-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                          <span class="sr-only">Loading...</span>
+                        </div>
+                        <span>Loading...</span>
+                    </div>
+                    <div id="errorMessage" class="mt-3 text-danger" style="display: none;"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Step 2: Show Weather Recommendation -->
+        <div class="card mb-4" id="resultsSection" style="display: none;">
+            <div class="card-body">
+                <h2>Weather Factors</h2>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Thunderstorm Alert Status:</strong>
+                        <span id="thunderstormAlert"></span>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Tornado Alert Status:</strong>
+                        <span id="tornadoAlert"></span>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Air Quality Index Category:</strong>
+                        <span id="airQuality"></span>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Temperature:</strong>
+                        <span id="temperature"></span> °F
+                    </li>
+                    <li class="list-group-item">
+                        <strong>% Chance of Rain:</strong>
+                        <span id="rainChance"></span> %
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Sustained Wind Speed:</strong>
+                        <span id="windSpeed"></span> mph
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Wind Gusting To:</strong>
+                        <span id="windGust"></span> mph
+                    </li>
+                </ul>
+
+                <div id="recommendation" class="mt-3">
+                    <h3>Recommendation:</h3>
+                    <p id="weatherRecommendation" class="lead"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Input Votes After Recommendation -->
+        <div class="card mb-4" id="votesSection" style="display: none;">
+            <div class="card-body">
+                <h4>Votes</h4>
+                <form id="voteForm">
+                    <div class="form-group">
+                        <label for="diningVote">Dining Vote:</label>
+                        <select id="diningVote" name="diningVote" class="form-control" required>
+                            <option value="Abstain">Abstain</option>
+                            <option value="Outside">Outside</option>
+                            <option value="Inside">Inside</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="programVote">Program Vote:</label>
+                        <select id="programVote" name="programVote" class="form-control" required>
+                            <option value="Abstain">Abstain</option>
+                            <option value="Outside">Outside</option>
+                            <option value="Inside">Inside</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="facilitiesVote">Facilities Vote:</label>
+                        <select id="facilitiesVote" name="facilitiesVote" class="form-control" required>
+                            <option value="Abstain">Abstain</option>
+                            <option value="Outside">Outside</option>
+                            <option value="Inside">Inside</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="voteSubmitButton" class="btn btn-primary">
+                        Submit Votes
+                    </button>
+                    <div id="voteErrorMessage" class="mt-3 text-danger" style="display: none;"></div>
+                </form>
+
+                <!-- Displaying votes after submission -->
+                <h4 class="mt-4">Votes Record:</h4>
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        <strong>Dining:</strong> <span id="diningVoteResult"></span>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Program:</strong> <span id="programVoteResult"></span>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Facilities:</strong> <span id="facilitiesVoteResult"></span>
+                    </li>
+                </ul>
+
+                <p class="mt-3">
+                    <strong>Final Decision:</strong> <span id="finalDecision"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Bootstrap JS and dependencies (optional but recommended for components like modals) -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+    ></script>
+    <script
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+    ></script>
+
+    <!-- External JavaScript file -->
+    <script src="app.js"></script>
+</body>
+</html>
