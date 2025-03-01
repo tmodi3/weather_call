@@ -1,16 +1,18 @@
 # Weather Decision App
 
-A responsive web application that helps determine whether events should be held indoors or outdoors based on current weather conditions. This tool analyzes weather parameters and provides recommendations for event locations.
+A responsive web application that determines whether events should be held indoors or outdoors based on real-time weather conditions. This application uses the OpenWeather API to fetch current weather data for the user's location and provides a recommendation based on multiple weather parameters.
 
 ![Weather Decision App Screenshot](https://via.placeholder.com/800x450/f5f7fa/333.png?text=Weather+Decision+App)
 
 ## Features
 
-- Real-time weather data retrieval from the National Weather Service (NWS) API
+- Automatic detection of user's location using browser geolocation or IP-based fallback
+- Real-time weather data from OpenWeather API
 - Air Quality Index data from AirNow API
-- Sophisticated weather condition analysis for decision-making
-- Voting system for dining, program, and facilities representatives
-- Mobile-responsive design for use on any device
+- Weather condition analysis and location-specific recommendations
+- Voting system for different departments (dining, program, facilities)
+- Mobile-responsive design for any device
+- Weather icons and detailed forecast display
 
 ## Weather Parameters Analyzed
 
@@ -18,9 +20,8 @@ The app analyzes multiple weather parameters to make informed recommendations:
 
 - **Temperature**: Evaluates comfort levels for outdoor events
 - **Wind Speed & Gusts**: Determines safety for outdoor structures
-- **Rain Chance**: Predicts precipitation likelihood
-- **Thunderstorm Alerts**: Monitors for severe weather threats
-- **Tornado Warnings**: Detects active tornado warnings in the area
+- **Chance of Rain**: Calculated based on cloud cover, humidity, and precipitation
+- **Thunderstorm Detection**: Monitors for severe weather threats
 - **Air Quality Index**: Assesses health risks from air pollution
 
 ## Setup and Installation
@@ -34,8 +35,8 @@ The app analyzes multiple weather parameters to make informed recommendations:
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
-   cd weather-decision-app
+   git clone https://github.com/tmodi3/weather_call.git
+   cd weather_call
    ```
 
 2. Install dependencies:
@@ -45,7 +46,8 @@ The app analyzes multiple weather parameters to make informed recommendations:
 
 3. Create a `.env` file in the root directory with your API keys:
    ```
-   AIRNOW_API_KEY=your_airnow_api_key_here
+   OPENWEATHER_API_KEY=your_openweather_api_key
+   AIRNOW_API_KEY=your_airnow_api_key
    PORT=3000
    ```
 
@@ -56,40 +58,41 @@ The app analyzes multiple weather parameters to make informed recommendations:
 
 5. Open your browser and navigate to `http://localhost:3000`
 
-## Deployment
+## Deployment to Render (Free Tier)
 
-### Deploy to Render (Free Tier)
+1. Create a Render account at [render.com](https://render.com) if you don't have one
 
-1. Create a new Web Service on [Render](https://render.com)
-2. Connect your GitHub repository
-3. Use the following settings:
+2. From your dashboard, click "New" and select "Web Service"
+
+3. Connect to your GitHub repository or select "Deploy from GitHub"
+   - You may need to authorize Render to access your GitHub account
+   - Search for and select the repository "weather_call"
+
+4. Configure your web service with the following settings:
+   - **Name**: weather-decision-app (or any name you prefer)
    - **Environment**: Node
+   - **Region**: Choose the closest to your target audience
+   - **Branch**: main
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
-   - **Add Environment Variables**: Add your `AIRNOW_API_KEY`
+   - **Plan**: Free
 
-### Deploy to Vercel (Free Tier)
+5. Add environment variables:
+   - Click "Advanced" and then "Add Environment Variable"
+   - Add the following keys and values:
+     - `OPENWEATHER_API_KEY`: your OpenWeather API key
+     - `AIRNOW_API_KEY`: your AirNow API key
 
-1. Create a new project on [Vercel](https://vercel.com)
-2. Import your GitHub repository
-3. Configure the project:
-   - **Framework Preset**: Node.js
-   - **Build Command**: `npm install`
-   - **Output Directory**: (leave empty)
-   - **Development Command**: `npm start`
-   - **Environment Variables**: Add your `AIRNOW_API_KEY`
+6. Click "Create Web Service"
 
-## API Documentation
+7. Render will automatically build and deploy your application
+   - The deployment may take a few minutes
+   - You can view the build logs to track progress
 
-### NWS (National Weather Service) API
-- No API key required, but a User-Agent header must be provided
-- Used for retrieving detailed weather forecast data
-- More info: https://www.weather.gov/documentation/services-web-api
+8. Once deployed, you'll get a URL like `https://weather-decision-app.onrender.com`
+   - This is your live application URL
 
-### AirNow API
-- Requires an API key (get one at https://docs.airnowapi.org/)
-- Used for obtaining current air quality data
-- Free tier limited to 500 calls per day
+9. Your app should now be accessible to anyone with internet access
 
 ## Decision Logic
 
@@ -122,10 +125,22 @@ Representatives from three departments can vote:
 - If 2+ votes for "Inside": Final decision is "Inside"
 - Otherwise: Final decision is "Depends"
 
-## License
+## APIs Used
 
-This project is licensed under the ISC License.
+### OpenWeather API
+- Used for current weather data
+- Free tier allows up to 1,000 calls per day
+- Documentation: [OpenWeather API Docs](https://openweathermap.org/api)
+
+### AirNow API
+- Used for air quality data
+- Free tier allows up to 500 calls per day
+- Documentation: [AirNow API Docs](https://docs.airnowapi.org/)
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the ISC License.
