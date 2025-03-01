@@ -2,146 +2,81 @@
 const axios = require('axios');
 
 /**
- * Fetch weather data from the NWS API with hourly granularity
+ * Fetch weather data from the OpenWeather API
  * @param {number} lat - Latitude of the location
  * @param {number} lon - Longitude of the location
- * @param {string} userAgent - User-Agent string for the API requests
- * @param {Date} eventStartTime - Event start time
+ * @param {string} apiKey - OpenWeather API key
  * @returns {Promise<Object>} - Weather forecast and alerts data
  */
-const fetchWeatherData = async (lat, lon, userAgent, eventStartTime) => {
+const fetchWeatherData = async (lat, lon, apiKey) => {
     try {
-        console.log('Fetching location metadata from NWS API...');
-        console.log(`Event start time: ${eventStartTime.toLocaleString()}`);
+        console.log('Fetching weather data from OpenWeather API...');
+        console.log(`Location: ${lat}, ${lon}`);
 
-        // Fetch the point data to get forecast URLs
-        const pointsResponse = await axios.get(`https://api.weather.gov/points/${lat},${lon}`, {
-            headers: { 'User-Agent': userAgent },
+        // Make API call to OpenWeather
+        const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather`, {
+            params: {
+                lat: lat,
+                lon: lon,
+                appid: apiKey,
+                units: 'imperial', // Use imperial units for temperature in Fahrenheit
+                lang: 'en'        // Response in English
+            },
             timeout: 10000 // 10 second timeout
         });
 
-        // Get both standard forecast and hourly forecast URLs
-        const forecastUrl = pointsResponse.data.properties.forecast;
-        const hourlyForecastUrl = pointsResponse.data.properties.forecastHourly;
-        const forecastZone = pointsResponse.data.properties.forecastZone;
-
-        if (!forecastUrl || !hourlyForecastUrl || !forecastZone) {
-            throw new Error('Required forecast URLs are undefined.');
-        }
-
-        // Try to get hourly forecast first (more precise)
-        console.log('Fetching hourly forecast data...');
-        let hourlyForecast = null;
-        try {
-            const hourlyResponse = await axios.get(hourlyForecastUrl, {
-                headers: { 'User-Agent': userAgent },
-                timeout: 10000
-            });
+        console.log('Weather data received from OpenWeather API');
+        
+        // Transform OpenWeather API response into our app's format
+        const weatherData = response.data;
+        
+        // Extract weather condition from the first weather item (if available)
+        const weatherCondition = weatherData.weather && weatherData.weather.length > 0 
+            ? weatherData.weather[0] 
+            : { main: 'Unknown', description: 'Unknown weather condition' };
+        
+        // Check for thunderstorm conditions
+        const isThunderstorm = weatherCondition.main === 'Thunderstorm';
+        
+        // Extract rain data (if available)
+        const rainAmount = weatherData.rain && weatherData.rain['1h'] 
+            ? weatherData.rain['1h'] 
+            : 0;
             
-            if (hourlyResponse.data && hourlyResponse.data.properties && 
-                hourlyResponse.data.properties.periods && 
-                hourlyResponse.data.properties.periods.length > 0) {
-                hourlyForecast = hourlyResponse.data.properties.periods;
+        // Calculate chance of rain (estimated based on clouds and humidity)
+        const rainChance = calculateRainChance(weatherData.clouds?.all, weatherData.main?.humidity, weatherCondition.main);
+        
+        // Format the data to match our application's expected structure
+        const formattedData = {
+            forecast: {
+                name: getCurrentTimeOfDay(),
+                startTime: new Date().toISOString(),
+                endTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+                temperature: weatherData.main?.temp,
+                temperatureUnit: 'F',
+                windSpeed: `${weatherData.wind?.speed || 0} mph`,
+                windDirection: getWindDirection(weatherData.wind?.deg),
+                windGust: `${weatherData.wind?.gust || 0} mph`,
+                shortForecast: weatherCondition.main,
+                detailedForecast: `${weatherCondition.description}. Temperature: ${weatherData.main?.temp}°F. ${rainChance}% chance of precipitation.`,
+                icon: weatherData.weather && weatherData.weather.length > 0 ? weatherData.weather[0].icon : '',
+                city: weatherData.name || 'Unknown Location',
+                country: weatherData.sys?.country || ''
+            },
+            alerts: {
+                features: [] // Default empty alerts
             }
-        } catch (hourlyError) {
-            console.warn('Error fetching hourly forecast, will fall back to standard forecast:', hourlyError.message);
-        }
-
-        // Find the relevant forecast period using hourly data if available
-        let relevantForecast = null;
-        if (hourlyForecast) {
-            // With hourly data, find the exact hour
-            relevantForecast = hourlyForecast.find(period => {
-                const periodStart = new Date(period.startTime);
-                const periodEnd = new Date(period.endTime);
-                return eventStartTime >= periodStart && eventStartTime < periodEnd;
-            });
-            
-            if (relevantForecast) {
-                console.log('Found matching hourly forecast for the event time');
-            }
-        }
-
-        // If no hourly forecast match, fall back to standard forecast
-        if (!relevantForecast) {
-            console.log('No hourly forecast found, fetching standard forecast...');
-            const forecastResponse = await axios.get(forecastUrl, {
-                headers: { 'User-Agent': userAgent },
-                timeout: 10000
-            });
-
-            const forecastPeriods = forecastResponse.data.properties.periods;
-
-            // Find the relevant forecast period
-            relevantForecast = forecastPeriods.find(period => {
-                const periodStart = new Date(period.startTime);
-                const periodEnd = new Date(period.endTime);
-                return eventStartTime >= periodStart && eventStartTime < periodEnd;
-            });
-
-            if (!relevantForecast) {
-                // No exact match, find the nearest future forecast period
-                console.warn('No exact forecast match for event time, using nearest future period.');
-                
-                // Convert the forecast periods to timestamps and find the closest one
-                const now = new Date();
-                const futurePeriods = forecastPeriods.filter(period => 
-                    new Date(period.endTime) > now
-                );
-                
-                if (futurePeriods.length > 0) {
-                    // Sort periods by start time (ascending)
-                    futurePeriods.sort((a, b) => 
-                        new Date(a.startTime) - new Date(b.startTime)
-                    );
-                    
-                    // Find the closest period to the event time
-                    const eventTime = eventStartTime.getTime();
-                    relevantForecast = futurePeriods.reduce((closest, current) => {
-                        const currentStart = new Date(current.startTime).getTime();
-                        const closestStart = closest ? new Date(closest.startTime).getTime() : Infinity;
-                        
-                        const currentDiff = Math.abs(currentStart - eventTime);
-                        const closestDiff = Math.abs(closestStart - eventTime);
-                        
-                        return currentDiff < closestDiff ? current : closest;
-                    }, null);
-                    
-                    console.log(`Selected nearest forecast period: ${relevantForecast.name}`);
-                } else {
-                    // No future periods available, use the first period
-                    relevantForecast = forecastPeriods[0];
-                    console.log('No future periods available, using first available period');
-                }
-            }
-        }
-
-        if (!relevantForecast) {
-            throw new Error('No forecast data available for the given time.');
-        }
-
-        console.log(`Selected forecast period: ${relevantForecast.name}`);
-        console.log(`Period time: ${new Date(relevantForecast.startTime).toLocaleString()} to ${new Date(relevantForecast.endTime).toLocaleString()}`);
-
-        // Fetch weather alerts with error handling
-        console.log('Fetching weather alerts...');
-        let alertsResponse;
-        try {
-            alertsResponse = await axios.get(`https://api.weather.gov/alerts/active?point=${lat},${lon}`, {
-                headers: { 'User-Agent': userAgent },
-                timeout: 8000 // 8 second timeout for alerts
-            });
-        } catch (alertError) {
-            console.error('Error fetching alerts (continuing anyway):', alertError.message);
-            alertsResponse = { data: { features: [] } }; // Empty alerts object
-        }
-
-        return {
-            forecast: relevantForecast,
-            alerts: alertsResponse.data,
         };
+        
+        console.log('Formatted forecast data:', formattedData.forecast);
+        
+        return formattedData;
     } catch (error) {
         console.error('Error fetching weather data:', error.message);
+        if (error.response) {
+            console.error('API response error:', error.response.status, error.response.data);
+        }
+        
         // Check for network issues and provide a clearer error message
         if (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.message.includes('timeout')) {
             throw new Error('Network timeout while connecting to weather service. Please try again later.');
@@ -149,5 +84,63 @@ const fetchWeatherData = async (lat, lon, userAgent, eventStartTime) => {
         throw error;
     }
 };
+
+/**
+ * Get the current time of day description
+ * @returns {string} - Description of the current time of day
+ */
+function getCurrentTimeOfDay() {
+    const hour = new Date().getHours();
+    
+    if (hour >= 5 && hour < 12) return 'Morning';
+    if (hour >= 12 && hour < 17) return 'Afternoon';
+    if (hour >= 17 && hour < 21) return 'Evening';
+    return 'Night';
+}
+
+/**
+ * Convert wind degrees to cardinal direction
+ * @param {number} degrees - Wind direction in degrees
+ * @returns {string} - Cardinal direction
+ */
+function getWindDirection(degrees) {
+    if (degrees === undefined) return 'Unknown';
+    
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round(((degrees %= 360) < 0 ? degrees + 360 : degrees) / 45) % 8;
+    return directions[index];
+}
+
+/**
+ * Calculate chance of rain based on clouds and humidity
+ * @param {number} cloudiness - Cloud percentage
+ * @param {number} humidity - Humidity percentage
+ * @param {string} weatherMain - Main weather condition
+ * @returns {number} - Estimated chance of rain (0-100)
+ */
+function calculateRainChance(cloudiness = 0, humidity = 0, weatherMain = '') {
+    // Base chance on cloudiness and humidity
+    let chance = 0;
+    
+    // If it's already raining or drizzling, high chance
+    if (weatherMain === 'Rain' || weatherMain === 'Drizzle') {
+        chance = 90;
+    } 
+    // If it's thunderstorm, very high chance
+    else if (weatherMain === 'Thunderstorm') {
+        chance = 95;
+    }
+    // Otherwise estimate based on cloud cover and humidity
+    else {
+        // Cloudiness contributes 60% to the rain chance
+        // Humidity contributes 40% to the rain chance
+        chance = (cloudiness * 0.6) + (humidity * 0.4);
+        
+        // Cap at 95%
+        chance = Math.min(chance, 95);
+    }
+    
+    return Math.round(chance);
+}
 
 module.exports = { fetchWeatherData };

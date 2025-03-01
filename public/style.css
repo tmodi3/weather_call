@@ -171,6 +171,39 @@ select {
     margin: 10px 0;
 }
 
+.weather-icon {
+    width: 40px;
+    height: 40px;
+    vertical-align: middle;
+}
+
+#locationDisplay {
+    font-size: 16px;
+    color: #555;
+    margin-top: 5px;
+}
+
+#scoreDetailsSection {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+#scoreDetailsSection h4 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+#scoreDetails .list-group-item {
+    padding: 8px 15px;
+    font-size: 14px;
+}
+
+footer {
+    opacity: 0.7;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767px) {
     .container {
@@ -194,5 +227,10 @@ select {
     
     #weatherRecommendation {
         font-size: 18px;
+    }
+    
+    .weather-icon {
+        width: 30px;
+        height: 30px;
     }
 }

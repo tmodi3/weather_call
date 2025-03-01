@@ -5,15 +5,18 @@ const cors = require('cors');
 const winston = require('winston');
 const { fetchAQI } = require('./server/airQuality');
 const { fetchWeatherData } = require('./server/weather');
+const { getGeolocationFromIP, getLocationFromCoordinates } = require('./server/geolocation');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Configurations
-const userAgent = process.env.USER_AGENT || 'Performance Weather Decision System (mubms@wisc.edu)';
+const openWeatherApiKey = process.env.OPENWEATHER_API_KEY || 'ed366a8a6b65f29654c39ef7bc4e7a86';
 const airNowApiKey = process.env.AIRNOW_API_KEY;
-const lat = 43.07625; // Latitude for Memorial Union Terrace
-const lon = -89.40006; // Longitude for Memorial Union Terrace
+
+// Default coordinates (Madison, WI)
+const defaultLat = 43.07625;
+const defaultLon = -89.40006;
 
 // Initialize Logger
 const logger = winston.createLogger({
@@ -36,8 +39,38 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
+// Route to get user's geolocation
+app.get('/getLocation', async (req, res) => {
+    try {
+        const geoData = await getGeolocationFromIP();
+        
+        if (geoData.success) {
+            logger.info(`Location detected: ${geoData.city}, ${geoData.country} (${geoData.lat}, ${geoData.lon})`);
+            res.json(geoData);
+        } else {
+            logger.warn(`Could not detect location, using default: ${defaultLat}, ${defaultLon}`);
+            res.json({
+                lat: defaultLat,
+                lon: defaultLon,
+                city: 'Madison',
+                region: 'Wisconsin',
+                country: 'United States',
+                countryCode: 'US',
+                usingDefault: true
+            });
+        }
+    } catch (error) {
+        logger.error(`Error getting location: ${error.message}`);
+        res.status(500).json({ 
+            error: 'Could not determine location',
+            lat: defaultLat,
+            lon: defaultLon
+        });
+    }
+});
+
 app.post('/getWeather', async (req, res) => {
-    const { eventTime } = req.body;
+    const { eventTime, lat, lon } = req.body;
 
     try {
         logger.info(`Received payload: ${JSON.stringify(req.body)}`);
@@ -54,21 +87,35 @@ app.post('/getWeather', async (req, res) => {
         eventStartTime.setHours(eventHour, eventMinute, 0, 0);
         logger.info(`Parsed event start time: ${eventStartTime}`);
 
-        // Fetch weather data
-        logger.info('Fetching weather data...');
-        const { forecast, alerts } = await fetchWeatherData(lat, lon, userAgent, eventStartTime);
+        // Use provided coordinates or default to Madison, WI
+        const latitude = lat || defaultLat;
+        const longitude = lon || defaultLon;
+        
+        // Get location name if coordinates are provided but no location info
+        let locationInfo = null;
+        if (lat && lon && (!req.body.city || !req.body.country)) {
+            try {
+                locationInfo = await getLocationFromCoordinates(latitude, longitude);
+            } catch (locError) {
+                logger.warn(`Could not get location info from coordinates: ${locError.message}`);
+            }
+        }
+
+        // Fetch weather data from OpenWeather API
+        logger.info(`Fetching weather data for: ${latitude}, ${longitude}`);
+        const { forecast, alerts } = await fetchWeatherData(latitude, longitude, openWeatherApiKey);
         logger.info('Weather data fetched successfully.');
 
         // Select the relevant forecast period
         const period = forecast;
-        logger.info(`Selected forecast period: ${JSON.stringify(period)}`);
+        logger.info(`Selected forecast period: ${period.name}`);
 
         // Parse forecast data
         const temp = period.temperature;
         const windSpeed = parseWindValue(period.windSpeed);
         const windGust = parseWindValue(period.windGust || '0 mph');
         const rainChance = extractRainChance(period.detailedForecast);
-        const thunderstorm = /thunderstorm/i.test(period.shortForecast);
+        const thunderstorm = period.shortForecast === 'Thunderstorm';
 
         logger.info(`Parsed forecast data for event: ${JSON.stringify({
             temp,
@@ -78,16 +125,14 @@ app.post('/getWeather', async (req, res) => {
             thunderstorm,
         })}`);
 
-        // Parse alerts for tornado warnings
-        const tornadoAlert = alerts.features?.some(alert =>
-            alert.properties.event.toLowerCase().includes('tornado')
-        ) || false;
+        // Check for tornado warnings (not available in basic OpenWeather API)
+        const tornadoAlert = false;
 
         logger.info(`Tornado alert: ${tornadoAlert}`);
 
         // Fetch AQI data
         logger.info('Fetching AQI data...');
-        const { aqi, airQuality } = await fetchAQI(lat, lon, airNowApiKey);
+        const { aqi, airQuality } = await fetchAQI(latitude, longitude, airNowApiKey);
         logger.info(`AQI data fetched successfully: { aqi: ${aqi}, airQuality: ${airQuality} }`);
 
         // Calculate recommendations
@@ -98,6 +143,11 @@ app.post('/getWeather', async (req, res) => {
         const periodStart = new Date(period.startTime);
         const periodEnd = new Date(period.endTime);
         const periodTimeRange = `${periodStart.toLocaleString()} to ${periodEnd.toLocaleString()}`;
+
+        // Get location name to display
+        const locationName = locationInfo?.city || period.city || req.body.city || 'Unknown Location';
+        const country = locationInfo?.country || period.country || req.body.country || '';
+        const locationDisplay = country ? `${locationName}, ${country}` : locationName;
 
         // Respond with all collected data
         const response = {
@@ -112,7 +162,11 @@ app.post('/getWeather', async (req, res) => {
             finalDecision: recommendation.finalDecision,
             forecastPeriod: period.name,
             forecastTime: periodTimeRange,
-            shortForecast: period.shortForecast
+            shortForecast: period.shortForecast,
+            location: locationDisplay,
+            score: recommendation.score,
+            scoreDetails: recommendation.scoreDetails,
+            weatherIcon: period.icon
         };
 
         logger.info(`Final response sent to frontend: ${JSON.stringify(response)}`);
@@ -124,7 +178,7 @@ app.post('/getWeather', async (req, res) => {
 });
 
 function parseWindValue(windStr) {
-    const numbers = windStr.match(/\d+/g);
+    const numbers = windStr.match(/\d+(\.\d+)?/g);
     if (!numbers) return 0;
     return Math.max(...numbers.map(Number));
 }
@@ -240,5 +294,5 @@ function calculateFinalDecision(diningVote, programVote, facilitiesVote) {
 }
 
 app.listen(port, () => {
-    logger.info(`Weather Call server running on port ${port}`);
+    logger.info(`Weather Decision App running on port ${port}`);
 });
